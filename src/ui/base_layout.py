@@ -40,14 +40,14 @@ def style_base_layout():
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 
 
-                /* hide top toolbar of streamlit*/
-                #MainMenu, header, footer {
-                    visibility: hidden;
-                    }
+                # /* hide top toolbar of streamlit*/
+                # #MainMenu, header, footer {
+                #     visibility: hidden;
+                #     }
 
-                .block-container {
-                    padding-top: 1.5rem !important;
-                    }
+                # .block-container {
+                #     padding-top: 1.5rem !important;
+                #     }
 
                 h1{
                     font-family: 'Climate Crisis', sans-serif !important;
