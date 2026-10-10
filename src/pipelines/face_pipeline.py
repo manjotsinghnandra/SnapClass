@@ -159,7 +159,7 @@ def predict_attendence(class_image_np):
             student_embedding - encoding
         )
 
-        reseamblence_threshold = 0.6
+        reseamblence_threshold = 0.5
 
         if best_match_score <= reseamblence_threshold:
 
