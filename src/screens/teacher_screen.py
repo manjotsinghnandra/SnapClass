@@ -37,6 +37,8 @@ def teacher_dashboard():
             st.rerun()
 
     st.space()
+
+    
     if "current_teacher_tab" not in st.session_state:
         st.session_state.current_teacher_tab = "Take_Attendence"
 
@@ -103,7 +105,7 @@ def teacher_tab_manage_subjects():
     if subjects:
         for sub in subjects:
             stats = [
-                ("🫂", "Students", sub["total_students"]),
+                ("🫂", "Student", sub["total_students"]),
                 ("⏱️", "Classes", sub["total_classes"]),
             ]
 
