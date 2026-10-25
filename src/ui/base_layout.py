@@ -40,7 +40,8 @@ def style_base_layout():
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 
 
-                # /* hide top toolbar of streamlit*/
+                /* hide top toolbar of streamlit*/
+                
                 # #MainMenu, header, footer {
                 #     visibility: hidden;
                 #     }
