@@ -42,9 +42,9 @@ def style_base_layout():
 
                 /* hide top toolbar of streamlit*/
                 
-                # #MainMenu, header, footer {
-                #     visibility: hidden;
-                #     }
+                #MainMenu, header, footer {
+                    visibility: hidden;
+                    }
 
                 .block-container {
                     padding-top: 5rem !important;
