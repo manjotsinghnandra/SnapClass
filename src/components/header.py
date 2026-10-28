@@ -1,5 +1,4 @@
 import streamlit as st
-from src.ui.base_layout import theme_toggle
 
 
 def header_home():
@@ -12,12 +11,6 @@ def header_home():
                 <h1 style='text-align:center; color:var(--color-primary)'>SNAP<br/>CLASS</h1>
             </div>
                 """, unsafe_allow_html=True)
-
-    # Place toggle in the top-right of the home header
-    with st.container():
-        _, toggle_col = st.columns([6, 1])
-        with toggle_col:
-            theme_toggle()
 
 
 def header_dashboard():

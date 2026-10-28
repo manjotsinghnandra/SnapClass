@@ -347,80 +347,164 @@ def style_base_dashboard():
 # ---------------------------------------------------------------------------
 
 def style_base_layout():
-    """Initialise theme (localStorage sync) and inject all CSS tokens."""
+    """Initialise theme (localStorage sync), inject all CSS tokens, and
+    render the fixed top-right theme toggle button."""
     init_theme()
     _apply_css()
+    _inject_fixed_toggle()
 
 
 # ---------------------------------------------------------------------------
-# Theme toggle widget
+# Fixed top-right theme toggle (injected into the parent DOM via st.markdown)
 # ---------------------------------------------------------------------------
 
-def theme_toggle():
+def _inject_fixed_toggle():
     """
-    Renders a compact sun/moon toggle button in an iframe.
-    Clicking it flips data-theme on the parent document, saves to
-    localStorage, and broadcasts to all sibling iframes.
+    Injects a permanently-visible, fixed-position sun/moon toggle button
+    directly into the Streamlit page DOM (NOT inside an iframe), so it
+    always sits in the top-right corner on every screen.
     """
-    toggle_html = """
-    <!DOCTYPE html><html><head>
+    st.markdown("""
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { background:transparent; display:flex; justify-content:flex-end; align-items:center; height:40px; }
-        .btn {
-            display:inline-flex; align-items:center; gap:6px;
-            border-radius:2rem; padding:5px 13px; cursor:pointer;
-            font-family:'Outfit','Segoe UI',sans-serif; font-size:13px;
-            border:1.5px solid rgba(160,160,150,0.4);
-            background:transparent; color:#65717A;
-            transition:background 0.2s, border-color 0.2s, transform 0.2s;
-            outline:none; white-space:nowrap;
-        }
-        html[data-theme="light"] .btn { background:#EBE6DC; border-color:#E5E0D6; color:#65717A; }
-        html[data-theme="dark"]  .btn { background:#2B343E; border-color:#343C45; color:#B4BDC6; }
-        .btn:hover { transform:scale(1.05); border-color:#8FAAC2; }
-        .btn:focus-visible { outline:2px solid #718BA4; outline-offset:2px; }
-        .icon-moon, .icon-sun { display:none; }
-        html[data-theme="light"] .icon-moon { display:inline-block; }
-        html[data-theme="dark"]  .icon-sun  { display:inline-block; }
+    /* ── Fixed toggle pill ─────────────────────────────────────────── */
+    #sc-theme-btn {
+        position: fixed;
+        top: 14px;
+        right: 18px;
+        z-index: 999999;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: var(--bg-secondary);
+        border: 1.5px solid var(--border-color);
+        border-radius: 2rem;
+        padding: 7px 16px;
+        cursor: pointer;
+        font-family: 'Outfit', 'Segoe UI', sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        box-shadow: var(--shadow);
+        transition: background 0.2s ease, border-color 0.2s ease,
+                    color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+        outline: none;
+        white-space: nowrap;
+        letter-spacing: 0.01em;
+    }
+    #sc-theme-btn:hover {
+        background: var(--color-accent);
+        border-color: var(--color-primary);
+        color: var(--text-primary);
+        transform: scale(1.05);
+        box-shadow: 0 4px 16px rgba(113, 139, 164, 0.25);
+    }
+    #sc-theme-btn:active { transform: scale(0.97); }
+    #sc-theme-btn:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 3px;
+    }
+    #sc-theme-btn svg {
+        flex-shrink: 0;
+        transition: transform 0.4s ease;
+    }
+    #sc-theme-btn:hover svg { transform: rotate(20deg); }
     </style>
-    </head>
-    <body>
-    <button class="btn" id="tgl" aria-label="Toggle theme">
-        <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+
+    <button id="sc-theme-btn" aria-label="Switch to dark mode" title="Toggle theme">
+        <!-- Moon (shown in light mode) -->
+        <svg id="sc-moon" xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+             viewBox="0 0 24 24" fill="currentColor">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
-        <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Sun (shown in dark mode, hidden initially) -->
+        <svg id="sc-sun" xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+             style="display:none">
             <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
-        <span id="lbl">Dark mode</span>
+        <span id="sc-lbl">Dark mode</span>
     </button>
+
     <script>
-    (function(){
-        var btn=document.getElementById('tgl'), lbl=document.getElementById('lbl');
-        function getTheme(){ try{ return window.parent.document.documentElement.getAttribute('data-theme')||'light'; }catch(e){return 'light';} }
-        function apply(t){
-            document.documentElement.setAttribute('data-theme',t);
-            lbl.textContent = t==='dark'?'Light mode':'Dark mode';
-            btn.setAttribute('aria-label', t==='dark'?'Switch to light mode':'Switch to dark mode');
+    (function () {
+        var btn  = document.getElementById('sc-theme-btn');
+        var moon = document.getElementById('sc-moon');
+        var sun  = document.getElementById('sc-sun');
+        var lbl  = document.getElementById('sc-lbl');
+        var html = document.documentElement;
+
+        function getTheme() {
+            return html.getAttribute('data-theme') || 'light';
         }
-        apply(getTheme());
-        btn.addEventListener('click',function(){
-            var next = getTheme()==='light'?'dark':'light';
-            try{ window.localStorage.setItem('snapclass_theme',next); }catch(e){}
-            try{ window.parent.document.documentElement.setAttribute('data-theme',next); }catch(e){}
-            try{ window.parent.postMessage({type:'snapclass_set_theme',theme:next},'*'); }catch(e){}
-            apply(next);
+
+        function applyUI(theme) {
+            if (theme === 'dark') {
+                moon.style.display = 'none';
+                sun.style.display  = 'inline';
+                lbl.textContent    = 'Light mode';
+                btn.setAttribute('aria-label', 'Switch to light mode');
+                btn.title = 'Switch to light mode';
+            } else {
+                moon.style.display = 'inline';
+                sun.style.display  = 'none';
+                lbl.textContent    = 'Dark mode';
+                btn.setAttribute('aria-label', 'Switch to dark mode');
+                btn.title = 'Switch to dark mode';
+            }
+        }
+
+        function setTheme(theme) {
+            html.setAttribute('data-theme', theme);
+            try { window.localStorage.setItem('snapclass_theme', theme); } catch(e) {}
+            applyUI(theme);
+            // Broadcast into any component iframes so they can sync too
+            try {
+                document.querySelectorAll('iframe').forEach(function(f) {
+                    try {
+                        f.contentWindow.postMessage(
+                            { type: 'snapclass_set_theme', theme: theme }, '*'
+                        );
+                    } catch(e) {}
+                });
+            } catch(e) {}
+        }
+
+        // Init from localStorage / OS preference
+        var stored = null;
+        try { stored = window.localStorage.getItem('snapclass_theme'); } catch(e) {}
+        var preferred = (window.matchMedia &&
+                         window.matchMedia('(prefers-color-scheme: dark)').matches)
+                        ? 'dark' : 'light';
+        var initial = stored || preferred;
+        html.setAttribute('data-theme', initial);
+        applyUI(initial);
+
+        btn.addEventListener('click', function () {
+            setTheme(getTheme() === 'light' ? 'dark' : 'light');
         });
-        window.addEventListener('message',function(e){
-            if(e.data&&e.data.type==='snapclass_set_theme') apply(e.data.theme);
+
+        // Keyboard: Space / Enter already trigger click on <button>
+        // Listen for theme changes from component iframes
+        window.addEventListener('message', function (e) {
+            if (e.data && e.data.type === 'snapclass_set_theme') {
+                html.setAttribute('data-theme', e.data.theme);
+                applyUI(e.data.theme);
+            }
         });
     })();
     </script>
-    </body></html>
-    """
-    components.html(toggle_html, height=42, scrolling=False)
+    """, unsafe_allow_html=True)
+
+
+# Keep old name as no-op so existing import sites don't break
+def theme_toggle():
+    pass
