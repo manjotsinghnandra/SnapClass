@@ -1,61 +1,17 @@
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 # ---------------------------------------------------------------------------
-# Theme initialiser – reads localStorage and sets data-theme on <html>.
-# Must be called ONCE per page before other st.markdown calls.
+# Theme handling
+#
+# The old toggle was an HTML <button> + <script> passed to st.markdown.
+# Streamlit strips <script> tags from markdown, so the button never had a
+# click handler. The toggle is now a real Streamlit button that flips
+# st.session_state["theme"]; the matching CSS tokens are rendered server-side
+# on every run, so it works on every screen and survives reruns.
 # ---------------------------------------------------------------------------
 
-def init_theme():
-    """Inject JS that reads localStorage, respects OS preference, and sets
-    data-theme on the parent document to prevent flash-of-wrong-theme."""
-
-    if "theme" not in st.session_state:
-        st.session_state["theme"] = "light"
-
-    components.html(
-        """
-        <script>
-        (function(){
-            function applyTheme(theme){
-                try {
-                    window.parent.document.documentElement.setAttribute('data-theme', theme);
-                } catch(e){}
-            }
-            var stored = null;
-            try { stored = window.localStorage.getItem('snapclass_theme'); } catch(e){}
-            var preferred = (window.matchMedia &&
-                             window.matchMedia('(prefers-color-scheme: dark)').matches)
-                            ? 'dark' : 'light';
-            var theme = stored || preferred;
-            applyTheme(theme);
-
-            window.addEventListener('message', function(e){
-                if(e.data && e.data.type === 'snapclass_set_theme'){
-                    var t = e.data.theme;
-                    try { window.localStorage.setItem('snapclass_theme', t); } catch(err){}
-                    applyTheme(t);
-                }
-            });
-        })();
-        </script>
-        """,
-        height=0,
-    )
-
-
-# ---------------------------------------------------------------------------
-# CSS variables – complete Warm Sand & Dusty Blue palette
-# ---------------------------------------------------------------------------
-
-_THEME_CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Climate+Crisis:YEAR@1979&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
-
-/* ── Light tokens (default) ──────────────────────────────────────── */
-:root, html[data-theme="light"] {
+_LIGHT_TOKENS = """
     --bg-main:            #F8F6F1;
     --bg-card:            #FFFFFF;
     --bg-secondary:       #EBE6DC;
@@ -76,10 +32,9 @@ _THEME_CSS = """
     --shadow-card:  0 4px 20px rgba(48, 59, 70, 0.07);
     --transition:   background-color 0.25s ease, color 0.25s ease,
                     border-color 0.25s ease, box-shadow 0.25s ease;
-}
+"""
 
-/* ── Dark tokens ─────────────────────────────────────────────────── */
-html[data-theme="dark"] {
+_DARK_TOKENS = """
     --bg-main:            #171C22;
     --bg-card:            #222A33;
     --bg-secondary:       #2B343E;
@@ -100,6 +55,17 @@ html[data-theme="dark"] {
     --shadow-card:  0 4px 20px rgba(0,0,0,0.30);
     --transition:   background-color 0.25s ease, color 0.25s ease,
                     border-color 0.25s ease, box-shadow 0.25s ease;
+"""
+
+_BASE_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Climate+Crisis:YEAR@1979&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+
+:root {
+    --transition: background-color 0.25s ease, color 0.25s ease,
+                  border-color 0.25s ease, box-shadow 0.25s ease;
+    /*__TOKENS__*/
 }
 
 /* ── Global base ─────────────────────────────────────────────────── */
@@ -306,12 +272,58 @@ div[data-testid="stToast"] {
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color) !important;
 }
+
+/* ── Theme toggle (fixed, top-right) ─────────────────────────────── */
+.st-key-theme_toggle {
+    position: fixed !important;
+    top: 14px;
+    right: 18px;
+    z-index: 999999;
+    width: auto !important;
+}
+.st-key-theme_toggle button {
+    padding: 7px 16px !important;
+    font-size: 13px !important;
+    box-shadow: var(--shadow) !important;
+}
 </style>
 """
 
 
+def _default_theme():
+    """Follow the browser/Streamlit theme on first load, else light."""
+    try:
+        if st.context.theme.type == "dark":
+            return "dark"
+    except Exception:
+        pass
+    return "light"
+
+
+def _flip_theme():
+    st.session_state["theme"] = "dark" if st.session_state.get("theme") == "light" else "light"
+
+
+def init_theme():
+    if "theme" not in st.session_state:
+        st.session_state["theme"] = _default_theme()
+
+
 def _apply_css():
-    st.markdown(_THEME_CSS, unsafe_allow_html=True)
+    tokens = _DARK_TOKENS if st.session_state["theme"] == "dark" else _LIGHT_TOKENS
+    st.markdown(_BASE_CSS.replace("/*__TOKENS__*/", tokens), unsafe_allow_html=True)
+
+
+def theme_toggle():
+    is_dark = st.session_state["theme"] == "dark"
+    st.button(
+        "Light mode" if is_dark else "Dark mode",
+        key="theme_toggle",
+        icon=":material/light_mode:" if is_dark else ":material/dark_mode:",
+        type="secondary",
+        on_click=_flip_theme,
+        help="Switch to light mode" if is_dark else "Switch to dark mode",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -343,168 +355,11 @@ def style_base_dashboard():
 
 
 # ---------------------------------------------------------------------------
-# Main entry point – call on every screen
+# Main entry point - call ONCE per run on every screen
 # ---------------------------------------------------------------------------
 
 def style_base_layout():
-    """Initialise theme (localStorage sync), inject all CSS tokens, and
-    render the fixed top-right theme toggle button."""
+    """Initialise theme state, inject CSS tokens, render the theme toggle."""
     init_theme()
     _apply_css()
-    _inject_fixed_toggle()
-
-
-# ---------------------------------------------------------------------------
-# Fixed top-right theme toggle (injected into the parent DOM via st.markdown)
-# ---------------------------------------------------------------------------
-
-def _inject_fixed_toggle():
-    """
-    Injects a permanently-visible, fixed-position sun/moon toggle button
-    directly into the Streamlit page DOM (NOT inside an iframe), so it
-    always sits in the top-right corner on every screen.
-    """
-    st.markdown("""
-    <style>
-    /* ── Fixed toggle pill ─────────────────────────────────────────── */
-    #sc-theme-btn {
-        position: fixed;
-        top: 14px;
-        right: 18px;
-        z-index: 999999;
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        background: var(--bg-secondary);
-        border: 1.5px solid var(--border-color);
-        border-radius: 2rem;
-        padding: 7px 16px;
-        cursor: pointer;
-        font-family: 'Outfit', 'Segoe UI', sans-serif;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        box-shadow: var(--shadow);
-        transition: background 0.2s ease, border-color 0.2s ease,
-                    color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-        outline: none;
-        white-space: nowrap;
-        letter-spacing: 0.01em;
-    }
-    #sc-theme-btn:hover {
-        background: var(--color-accent);
-        border-color: var(--color-primary);
-        color: var(--text-primary);
-        transform: scale(1.05);
-        box-shadow: 0 4px 16px rgba(113, 139, 164, 0.25);
-    }
-    #sc-theme-btn:active { transform: scale(0.97); }
-    #sc-theme-btn:focus-visible {
-        outline: 2px solid var(--focus-ring);
-        outline-offset: 3px;
-    }
-    #sc-theme-btn svg {
-        flex-shrink: 0;
-        transition: transform 0.4s ease;
-    }
-    #sc-theme-btn:hover svg { transform: rotate(20deg); }
-    </style>
-
-    <button id="sc-theme-btn" aria-label="Switch to dark mode" title="Toggle theme">
-        <!-- Moon (shown in light mode) -->
-        <svg id="sc-moon" xmlns="http://www.w3.org/2000/svg" width="15" height="15"
-             viewBox="0 0 24 24" fill="currentColor">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-        <!-- Sun (shown in dark mode, hidden initially) -->
-        <svg id="sc-sun" xmlns="http://www.w3.org/2000/svg" width="15" height="15"
-             viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-             style="display:none">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-        <span id="sc-lbl">Dark mode</span>
-    </button>
-
-    <script>
-    (function () {
-        var btn  = document.getElementById('sc-theme-btn');
-        var moon = document.getElementById('sc-moon');
-        var sun  = document.getElementById('sc-sun');
-        var lbl  = document.getElementById('sc-lbl');
-        var html = document.documentElement;
-
-        function getTheme() {
-            return html.getAttribute('data-theme') || 'light';
-        }
-
-        function applyUI(theme) {
-            if (theme === 'dark') {
-                moon.style.display = 'none';
-                sun.style.display  = 'inline';
-                lbl.textContent    = 'Light mode';
-                btn.setAttribute('aria-label', 'Switch to light mode');
-                btn.title = 'Switch to light mode';
-            } else {
-                moon.style.display = 'inline';
-                sun.style.display  = 'none';
-                lbl.textContent    = 'Dark mode';
-                btn.setAttribute('aria-label', 'Switch to dark mode');
-                btn.title = 'Switch to dark mode';
-            }
-        }
-
-        function setTheme(theme) {
-            html.setAttribute('data-theme', theme);
-            try { window.localStorage.setItem('snapclass_theme', theme); } catch(e) {}
-            applyUI(theme);
-            // Broadcast into any component iframes so they can sync too
-            try {
-                document.querySelectorAll('iframe').forEach(function(f) {
-                    try {
-                        f.contentWindow.postMessage(
-                            { type: 'snapclass_set_theme', theme: theme }, '*'
-                        );
-                    } catch(e) {}
-                });
-            } catch(e) {}
-        }
-
-        // Init from localStorage / OS preference
-        var stored = null;
-        try { stored = window.localStorage.getItem('snapclass_theme'); } catch(e) {}
-        var preferred = (window.matchMedia &&
-                         window.matchMedia('(prefers-color-scheme: dark)').matches)
-                        ? 'dark' : 'light';
-        var initial = stored || preferred;
-        html.setAttribute('data-theme', initial);
-        applyUI(initial);
-
-        btn.addEventListener('click', function () {
-            setTheme(getTheme() === 'light' ? 'dark' : 'light');
-        });
-
-        // Keyboard: Space / Enter already trigger click on <button>
-        // Listen for theme changes from component iframes
-        window.addEventListener('message', function (e) {
-            if (e.data && e.data.type === 'snapclass_set_theme') {
-                html.setAttribute('data-theme', e.data.theme);
-                applyUI(e.data.theme);
-            }
-        });
-    })();
-    </script>
-    """, unsafe_allow_html=True)
-
-
-# Keep old name as no-op so existing import sites don't break
-def theme_toggle():
-    pass
+    theme_toggle()
