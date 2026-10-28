@@ -25,6 +25,13 @@ def load_dlib_mdodels():
 def get_face_embeddings(image_np):
 
     detactor, sp, facerec = load_dlib_mdodels()
+
+    # dlib needs 8-bit RGB (camera PNGs can be RGBA / grayscale)
+    image_np = np.asarray(image_np)
+    if image_np.ndim == 2:
+        image_np = np.stack([image_np] * 3, axis=-1)
+    image_np = np.ascontiguousarray(image_np[..., :3]).astype(np.uint8)
+
     faces = detactor(image_np, 1)
 
     encodings = []
@@ -83,7 +90,7 @@ def get_trained_model():
 
     clf = SVC(
         kernel="linear",
-        probability=True,
+        probability=False,
         class_weight="balanced"
     )
 
@@ -98,7 +105,7 @@ def get_trained_model():
 
 def train_classifier():
 
-    st.cache_resource.clear()
+    get_trained_model.clear()
 
     model_data = get_trained_model()
 

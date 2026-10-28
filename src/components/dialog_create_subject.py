@@ -11,12 +11,13 @@ def create_subject_dialog(teacher_id):
 
 
     if st.button("Create Subject Now", type="primary", width="stretch"):
+        sub_id, sub_name, sub_section = sub_id.strip(), sub_name.strip(), sub_section.strip()
         if sub_id and sub_name and sub_section :
             try:
                 create_subject(sub_id, sub_name, sub_section, teacher_id)
                 st.toast("Subject Created Successfully")
                 st.rerun()
             except Exception as e:
-                st.error(f"str{e}")
+                st.error(f"Could not create subject (code may already exist): {e}")
         else:
             st.warning("Please fill all the fields")

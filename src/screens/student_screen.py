@@ -11,6 +11,7 @@ from src.database.db import get_all_students, create_student, get_student_subjec
 
 from src.components.dialog_enroll import enroll_dialog
 from src.components.subject_card import subject_card
+from src.components.dialog_auto_enroll import auto_enroll_dialog
 
 
 def student_dashboard():
@@ -29,6 +30,11 @@ def student_dashboard():
     
     st.space()
     st.space()
+
+    join_code = (st.query_params.get("join-code") or "").strip()
+    if join_code and st.session_state.get("handled_join_code") != join_code:
+        st.session_state.handled_join_code = join_code
+        auto_enroll_dialog(join_code)
 
     c1, c2 = st.columns(2)
     with c1:
@@ -52,9 +58,9 @@ def student_dashboard():
             if sid not in stats_map:
                 stats_map [sid] = {"total": 0, "attended": 0}
 
-                stats_map [sid] ['total'] +=1
+            stats_map [sid] ['total'] +=1
 
-            if logs.get('is_present'):
+            if log.get('is_present'):
                 stats_map [sid] ['attended'] += 1
 
         cols = st.columns(2)
@@ -65,7 +71,7 @@ def student_dashboard():
             stats = stats_map.get(sid,{"total": 0, "attended": 0})
 
             def unenroll_button():
-                if st.button("Unenroll fronm this course", type="tertiary", width="stretch", icon=":material/delete_forever:"):
+                if st.button("Unenroll fronm this course", type="tertiary", width="stretch", icon=":material/delete_forever:", key=f"unenroll_{sid}"):
                     unenroll_student_to_subject(student_id, sid)
                     st.toast(f"unenrolled from {sub['name']} successfully")
                     st.rerun()
@@ -119,33 +125,32 @@ def student_screen():
 
     show_registerations = False
     photo_source = st.camera_input("position your face in the center of the frame")
+    img = None
     if photo_source:
-        img = np.array(Image.open(photo_source))
+        img = np.array(Image.open(photo_source).convert("RGB"))
 
         with st.spinner("Verifying your identity..."):
             detected, all_ids, num_faces = predict_attendence(img)
 
-            if num_faces == 0:
-                st.warning("face not found!")
-            elif num_faces > 1:
-                st.warning("Multiple faces detected!")
-            else:
-                if detected:
-                    student_id = list(detected.keys())[0]
-                    all_students = get_all_students()
-                    student = next((s for s in all_students if s["student_id"] == student_id), None) 
+        if num_faces == 0:
+            st.warning("face not found!")
+        elif num_faces > 1:
+            st.warning("Multiple faces detected!")
+        elif detected:
+            student_id = list(detected.keys())[0]
+            all_students = get_all_students()
+            student = next((s for s in all_students if s["student_id"] == student_id), None)
 
-
-                    if student:
-                        st.session_state.is_logged_in = True
-                        st.session_state.user_role = 'student'
-                        st.session_state.student_data = student
-                        st.toast(f"Welcome back, {student['name']}!")
-                        time.sleep(1)
-                        st.rerun()
-                else:
-                    st.info("Face not recognized. you might be a new student.")
-                    show_registerations = True
+            if student:
+                st.session_state.is_logged_in = True
+                st.session_state.user_role = 'student'
+                st.session_state.student_data = student
+                st.toast(f"Welcome back, {student['name']}!")
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.info("Face not recognized. you might be a new student.")
+            show_registerations = True
 
     if show_registerations:
         with st.container(border=True):
@@ -155,30 +160,24 @@ def student_screen():
             st.subheader("optional : voice enrollment")
             st.info("enroll yourself for voice only attendance")
 
+            audio_data = st.audio_input("record a short phrase like , I am present and my name is red john")
 
-            audio_data = None
+            if st.button("Create Account", type="primary"):
+                if not new_name.strip():
+                    st.warning("please enter your name")
+                else:
+                    with st.spinner("Creating Profile..."):
+                        encodings = get_face_embeddings(img)
+                        if not encodings:
+                            st.error("couldn't capture your facial features for registration")
+                        else:
+                            face_emb = encodings[0].tolist()
 
-            try:
-                audio_data = st.audio_input("record a short phrase like , I am present and my name is red john")
-            except Exception:
-                st.error("audio data failed")
+                            voice_emb = None
+                            if audio_data:
+                                voice_emb = get_voice_embedding(audio_data.read())
 
-
-            st.button("Create Accnount", type="primary")
-            if new_name:
-                with st.spinner("Creating Profile..."):
-                    img = np.array(Image.open(photo_source))
-                    encodings = get_face_embeddings(img)
-                    if encodings:
-                        face_emb = encodings[0].tolist()
-
-                        voice_emb = None
-                        if audio_data:
-                            voice_emb = get_voice_embedding(audio_data.read())
-
-
-                            response_data = create_student(new_name, face_embeddings=face_emb, voice_embeddings=voice_emb)
-
+                            response_data = create_student(new_name.strip(), face_embeddings=face_emb, voice_embeddings=voice_emb)
 
                             if response_data:
                                 train_classifier()
@@ -188,13 +187,5 @@ def student_screen():
                                 st.toast(f"Profile Created, Hi {new_name}!")
                                 time.sleep(1)
                                 st.rerun()
-                        else:
-                            st.error("coudnt capture your facial features for regsiteration")
-            else:
-                st.warning("please enter your name")
 
     footer_dashboard()
-
-
-
-    

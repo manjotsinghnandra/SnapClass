@@ -17,19 +17,24 @@ def get_voice_embedding(audio_bytes):
         embedding = encoder.embed_utterance(wav)
         return embedding.tolist()
     except Exception as e:
-        st.error("Error occurred while processing audio")
+        st.error(f"Error occurred while processing audio: {e}")
         return None
 
-def identify_speaker(new_embedding, candidate_dict, threshold=0.65):
+def identify_speaker(new_embedding, candidate_dict, threshold=0.70):
     if new_embedding is None or not candidate_dict:
         return None, 0.0
 
     best_sid = None
     best_score = -1.0
+    new_embedding = np.asarray(new_embedding, dtype=float)
 
     for sid, stored_embedding in candidate_dict.items():
-        if stored_embedding:
-            similarity = np.dot(new_embedding, stored_embedding)
+        if stored_embedding is not None and len(stored_embedding) > 0:
+            stored = np.asarray(stored_embedding, dtype=float)
+            denom = np.linalg.norm(new_embedding) * np.linalg.norm(stored)
+            if denom == 0:
+                continue
+            similarity = float(np.dot(new_embedding, stored) / denom)
             if similarity > best_score:
                 best_score = similarity
                 best_sid = sid
@@ -41,7 +46,7 @@ def identify_speaker(new_embedding, candidate_dict, threshold=0.65):
 
 
 
-def process_bulk_audio(audio_bytes, candidate_dict, threshold=0.65):
+def process_bulk_audio(audio_bytes, candidate_dict, threshold=0.70):
 
     try:
         encoder = load_voice_encoder()
@@ -56,9 +61,8 @@ def process_bulk_audio(audio_bytes, candidate_dict, threshold=0.65):
         for start, end in segments:
             if (end-start) < sr*0.5:
                 continue
-            segment_audio = audio[start:end]
-            wav = preprocess_wav(segment_audio)
-            embedding = encoder.embed_utterance(wav)
+            segment_wav = wav[start:end]
+            embedding = encoder.embed_utterance(segment_wav)
 
 
 
@@ -71,7 +75,7 @@ def process_bulk_audio(audio_bytes, candidate_dict, threshold=0.65):
         return identified_results
     
     except Exception as e:
-        st.error("Bulk processing error")
+        st.error(f"Bulk processing error: {e}")
         return {}
 
 

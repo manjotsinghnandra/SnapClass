@@ -46,7 +46,7 @@ def teacher_dashboard():
     st.space()
 
     if "current_teacher_tab" not in st.session_state:
-        st.session_state.current_teacher_tab = "Take_Attendence"
+        st.session_state.current_teacher_tab = "take_attendence"
 
     tab1, tab2, tab3 = st.columns(3)
     with tab1:
@@ -166,7 +166,7 @@ def teacher_tab_take_attendence():
                             "is_present": bool(is_present)
                         })
 
-                attendence_result_dialog(pd.DataFrame(results), attendence_to_log)
+                    attendence_result_dialog(pd.DataFrame(results), attendence_to_log)
 
     with c3:
         if st.button("Use Voice Attendance", type="primary", width="stretch", icon=":material/mic:"):
@@ -194,10 +194,10 @@ def teacher_tab_manage_subjects():
                 ("⏱️", "Classes", sub["total_classes"]),
             ]
 
-            def share_btn(name=sub["name"], code=sub["subject_code"]):
+            def share_btn(name=sub["name"], code=sub["subject_code"], sid=sub["subject_id"]):
                 if st.button(
                     f"Share Code: {name}",
-                    key=f"share_{code}",
+                    key=f"share_{sid}",
                     icon=":material/share:"
                 ):
                     share_subject_dialog(name, code)
@@ -221,6 +221,7 @@ def teacher_tab_attendence_records():
     records = get_attendance_for_teacher(teacher_id)
 
     if not records:
+        st.info("No attendance records yet")
         return
 
     data =[]
@@ -229,7 +230,7 @@ def teacher_tab_attendence_records():
         ts = r.get('timestamp')
         data.append({
             "ts_group": ts.split(".")[0] if ts else None,
-            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M%p") if ts else "N'A",
+            "Time": pd.to_datetime(ts).strftime("%Y-%m-%d %I:%M%p") if ts else "N/A",
             "Subject": r['subjects'] ['name'],
             "Subject Code": r['subjects'] ['subject_code'],
             "is_present": bool(r.get('is_present', False))
@@ -316,6 +317,7 @@ def teacher_screen_login():
     with btnc2:
         if st.button("Register Instead",type="primary", icon=":material/passkey:", width="stretch"):
             st.session_state.teacher_login_type = 'register'
+            st.rerun()
 
     footer_dashboard()
 
@@ -384,5 +386,6 @@ def teacher_screen_register():
     with btnc2:
         if st.button("Login Instead",type="primary", icon=":material/passkey:", width="stretch"):
             st.session_state.teacher_login_type = 'login'
+            st.rerun()
 
     footer_dashboard()
